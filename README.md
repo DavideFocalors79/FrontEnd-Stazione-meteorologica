@@ -18,6 +18,7 @@ Cosa è implementato:
 - Esportazione dati in CSV
 
 Prossimi passi consigliati:
-- Collegare i dati reali dal sensore via WebSocket/HTTP
+- Collegare i dati reali dal sensore via ThingsBoard
 - Aggiungere autenticazione e notifiche
+
 - Migliorare accessibilità e internazionalizzazione
