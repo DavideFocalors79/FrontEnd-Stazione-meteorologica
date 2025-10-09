@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dashboard Stazione Meteo</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Stazione Meteo</h1>
+    <div class="controls">
+      <button id="btn-settings">Impostazioni</button>
+      <button id="btn-export">Esporta dati</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="current">
+      <div class="card current-card">
+        <h2 id="location">Località: Sede</h2>
+        <div class="main-row">
+          <div class="temp">
+            <div id="temperature">--°C</div>
+            <div id="condition">--</div>
+          </div>
+          <div class="details">
+            <div>Umidità: <span id="humidity">--%</span></div>
+            <div>Pressione: <span id="pressure">-- hPa</span></div>
+            <div>Vento: <span id="wind">-- km/h</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="charts">
+      <div class="card">
+        <h3>Temperature (24h)</h3>
+        <div class="chart-wrap"><canvas id="tempChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>Umidità e Precipitazioni</h3>
+        <div class="chart-wrap"><canvas id="humChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>Pressione</h3>
+        <div class="chart-wrap small"><canvas id="presChart"></canvas></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings modal -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-content">
+      <h2 id="modalTitle">Impostazioni</h2>
+      <label>
+        Unità di temperatura:
+        <select id="unitTemp">
+          <option value="C">Celsius (°C)</option>
+          <option value="F">Fahrenheit (°F)</option>
+        </select>
+      </label>
+      <label>
+        Velocità del vento:
+        <select id="unitWind">
+          <option value="kmh">km/h</option>
+          <option value="mph">mph</option>
+        </select>
+      </label>
+      <label>
+        Tema:
+        <select id="themeSelect">
+          <option value="light">Chiaro</option>
+          <option value="dark">Scuro</option>
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" id="mockData"> Simula dati (mock)
+      </label>
+      <div class="modal-actions">
+        <button id="saveSettings">Salva</button>
+        <button id="closeModal">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
