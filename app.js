@@ -1,200 +1,233 @@
-// Mock dashboard app.js
-const state = {
-  unitTemp: 'C',
-  unitWind: 'kmh',
-  theme: 'light',
-  data: [],
-  mockEnabled: false,
+const qs = s => document.querySelector(s);
+const qsa = s => document.querySelectorAll(s);
+
+// Oggetto per la gestione dello stato dell'applicazione
+const appState = {
+    isLoggedIn: false,
+    user: {
+        name: 'Mario Rossi',
+        email: 'mario@email.it',
+        role: 'Utente',
+    },
+    settings: {
+        unitTemp: 'C',
+        theme: 'light', // Può essere 'light' o 'dark'
+    },
+    currentWeatherData: {
+        location: 'Sede Centrale',
+        temperature: 24.5,
+        condition: 'Soleggiato ☀️',
+        humidity: 65,
+        pressure: 1012,
+        wind: 15,
+    },
+    alerts: [
+        { message: 'Vento forte atteso dalle 14:00. Prestare attenzione.', severity: 'normal' },
+        { message: 'Allerta Critica: Rischio idrogeologico elevato.', severity: 'critical' },
+    ]
+};
+
+// --- Funzioni di Interfaccia ---
+
+/** Mostra una pagina all'interno della dashboard */
+function showPage(id) {
+    qsa('.page').forEach(p => p.classList.remove('active'));
+    const page = qs(`#page-${id}`);
+    if (page) page.classList.add('active');
+
+    // Aggiorna l'indicatore attivo nella navbar
+    qsa('.nav-link').forEach(btn => btn.classList.remove('active-nav'));
+    qs(`.nav-link[data-target="${id}"]`).classList.add('active-nav');
 }
 
-// DOM refs
-const tempEl = document.getElementById('temperature')
-const humidityEl = document.getElementById('humidity')
-const pressureEl = document.getElementById('pressure')
-const windEl = document.getElementById('wind')
-const conditionEl = document.getElementById('condition')
-
-// modal
-const modal = document.getElementById('modal')
-const btnSettings = document.getElementById('btn-settings')
-const closeModal = document.getElementById('closeModal')
-const saveSettings = document.getElementById('saveSettings')
-const unitTempSelect = document.getElementById('unitTemp')
-const unitWindSelect = document.getElementById('unitWind')
-const themeSelect = document.getElementById('themeSelect')
-const btnExport = document.getElementById('btn-export')
-const mockCheckbox = document.getElementById('mockData')
-
-btnSettings.addEventListener('click', ()=> modal.classList.remove('hidden'))
-closeModal.addEventListener('click', ()=> modal.classList.add('hidden'))
-saveSettings.addEventListener('click', ()=>{
-  state.unitTemp = unitTempSelect.value
-  state.unitWind = unitWindSelect.value
-  state.theme = themeSelect.value
-  state.mockEnabled = mockCheckbox.checked
-  applyTheme()
-  modal.classList.add('hidden')
-  render()
-  // start/stop mock generator based on setting
-  if(state.mockEnabled) startMockUpdates()
-  else stopMockUpdates()
-})
-
-btnExport.addEventListener('click', ()=> exportData())
-
-function applyTheme(){
-  if(state.theme === 'dark') document.body.classList.add('dark')
-  else document.body.classList.remove('dark')
+/** Mostra una sezione principale (login, register, dashboard) */
+function showSection(id) {
+    qsa('.section').forEach(s => s.classList.remove('active'));
+    const section = qs(`#${id}`);
+    if (section) section.classList.add('active');
+    
+    // Gestione stato login
+    if (id === 'dashboard-section') {
+        appState.isLoggedIn = true;
+        updateDashboard();
+        updateUserProfile();
+        updateAlerts();
+        showPage('dashboard');
+    } else {
+        appState.isLoggedIn = false;
+    }
 }
 
-// Mock data generator
-function generateMockPoint(date){
-  // simple oscillation + randomness
-  const baseTemp = 18 + 6*Math.sin(date.getHours()/24*2*Math.PI)
-  return {
-    ts: date.toISOString(),
-    tempC: +(baseTemp + (Math.random()-0.5)*2).toFixed(2),
-    humidity: +(50 + (Math.random()-0.5)*20).toFixed(0),
-    pressure: +(1013 + (Math.random()-0.5)*8).toFixed(1),
-    windKmh: +(5 + Math.abs(Math.random()*15)).toFixed(1),
-  }
+// --- Funzioni di Aggiornamento Dati e UI ---
+
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+    } else {
+        document.body.classList.remove('dark-theme');
+    }
+    // Ridisegna i grafici con i nuovi colori del tema
+    initCharts(); 
 }
 
-// seed 24 points (hourly)
-// seed only when mock is enabled
-function seedInitialData(){
-  const now = new Date()
-  for(let i=23;i>=0;i--){
-    const d = new Date(now.getTime() - i*60*60*1000)
-    state.data.push(generateMockPoint(d))
-  }
+function updateDashboard() {
+    const { temperature, condition, humidity, pressure, wind } = appState.currentWeatherData;
+    const unit = appState.settings.unitTemp;
+    
+    let displayTemp = temperature;
+    if (unit === 'F') {
+        displayTemp = (temperature * 9 / 5) + 32;
+    }
+
+    qs('#location').textContent = `Località: ${appState.currentWeatherData.location}`;
+    qs('#temperature').textContent = `${displayTemp.toFixed(1)}°${unit}`;
+    qs('#condition').textContent = condition;
+    qs('#humidity').textContent = `${humidity}%`;
+    qs('#pressure').textContent = `${pressure} hPa`;
+    qs('#wind').textContent = `${wind} km/h`;
 }
 
-// Charts
-let tempChart, humChart, presChart
-let mockIntervalId = null
-function createCharts(){
-  const tempCtx = document.getElementById('tempChart').getContext('2d')
-  tempChart = new Chart(tempCtx, {
-    type:'line',
-    data:{labels:state.data.map(p=>new Date(p.ts).getHours()+':00'),datasets:[{label:'°C',data:state.data.map(p=>p.tempC),borderColor:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),fill:false}]},
-    options:{responsive:true,maintainAspectRatio:false}
-  })
-
-  const humCtx = document.getElementById('humChart').getContext('2d')
-  humChart = new Chart(humCtx,{type:'bar',data:{labels:state.data.map(p=>new Date(p.ts).getHours()+':00'),datasets:[{label:'Umidità %',data:state.data.map(p=>p.humidity),backgroundColor:'#7eb6ff'},{label:'Precipitazioni mm',data:state.data.map(_=>Math.random()*4),backgroundColor:'#4aa3ff'}]},options:{responsive:true,maintainAspectRatio:false}})
-
-  const presCtx = document.getElementById('presChart').getContext('2d')
-  presChart = new Chart(presCtx,{type:'line',data:{labels:state.data.map(p=>new Date(p.ts).getHours()+':00'),datasets:[{label:'hPa',data:state.data.map(p=>p.pressure),borderColor:'#6ab04c',fill:false}]},options:{responsive:true,maintainAspectRatio:false}})
+function updateUserProfile() {
+    qs('#profileName').textContent = appState.user.name;
+    qs('#profileEmail').textContent = appState.user.email;
+    qs('#profileRole').textContent = appState.user.role;
 }
 
-function updateCharts(){
-  // ensure temperature dataset label matches selected unit
-  if(tempChart && tempChart.data && tempChart.data.datasets && tempChart.data.datasets[0]){
-    tempChart.data.datasets[0].label = state.unitTemp === 'C' ? '°C' : '°F'
-  }
-  tempChart.data.datasets[0].data = state.data.map(p=>convertTempForChart(p))
-  tempChart.data.labels = state.data.map(p=>new Date(p.ts).getHours()+':00')
-  tempChart.update()
+function updateAlerts() {
+    const alertsList = qs('#alertsList');
+    alertsList.innerHTML = '';
+    
+    if (appState.alerts.length === 0) {
+        alertsList.innerHTML = '<li>Nessuna allerta presente.</li>';
+        return;
+    }
 
-  humChart.data.datasets[0].data = state.data.map(p=>p.humidity)
-  humChart.data.datasets[1].data = state.data.map(_=>Math.random()*4)
-  humChart.update()
-
-  presChart.data.datasets[0].data = state.data.map(p=>p.pressure)
-  presChart.update()
+    appState.alerts.forEach(alert => {
+        const li = document.createElement('li');
+        li.textContent = alert.message;
+        if (alert.severity === 'critical') {
+            li.classList.add('critical');
+        }
+        alertsList.appendChild(li);
+    });
 }
 
-function convertTempForChart(p){
-  return state.unitTemp === 'C' ? p.tempC : +(p.tempC*9/5+32).toFixed(2)
+// --- Grafici (Migliorati) ---
+
+// Mappa i colori in base al tema per una migliore leggibilità
+const getChartColors = () => {
+    if (appState.settings.theme === 'dark') {
+        return {
+            temp: '#ff6b6b', hum: '#868e96', pres: '#51cf66', forecast: '#fcc419', history: '#7950f2'
+        };
+    } else {
+        return {
+            temp: '#ff6b6b', hum: '#4dabf7', pres: '#51cf66', forecast: '#fcc419', history: '#7950f2'
+        };
+    }
+};
+
+function createDemoChart(id, label, color) {
+    const canvas = qs(`#${id}`);
+    if (canvas.chart) {
+        canvas.chart.destroy(); // Distrugge il vecchio grafico prima di ricrearlo
+    }
+
+    const ctx = canvas.getContext('2d');
+    
+    // Generazione dati demo
+    let data = Array.from({length: 24}, () => Math.floor(Math.random() * 30) + 5); 
+    if (id === 'tempChart') data = Array.from({length: 24}, (_, i) => Math.floor(Math.random() * 15) + 15);
+    else if (id === 'presChart') data = Array.from({length: 24}, (_, i) => Math.floor(Math.random() * 10) + 1005);
+    
+    canvas.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array.from({length: 24}, (_, i) => (i < 10 ? '0' + i : i) + ":00"),
+            datasets: [{
+                label: label,
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '33',
+                tension: 0.4, 
+                fill: true,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: false, ticks: { color: appState.settings.theme === 'dark' ? '#ccc' : '#333' } }
+            }
+        }
+    });
 }
 
-function render(){
-  // if no data yet, show placeholders and avoid errors
-  if(!state.data || state.data.length === 0){
-    tempEl.textContent = '--'
-    humidityEl.textContent = '--%'
-    pressureEl.textContent = '--'
-    windEl.textContent = '--'
-    conditionEl.textContent = '--'
-    if(tempChart) updateCharts()
-    return
-  }
-
-  const latest = state.data[state.data.length-1]
-  const temp = state.unitTemp === 'C' ? latest.tempC : +(latest.tempC*9/5+32).toFixed(1)
-  tempEl.textContent = temp + (state.unitTemp === 'C' ? '°C':'°F')
-  humidityEl.textContent = latest.humidity + '%'
-  pressureEl.textContent = latest.pressure + ' hPa'
-  const wind = state.unitWind === 'kmh' ? latest.windKmh : +(latest.windKmh*0.621371).toFixed(1)
-  windEl.textContent = wind + (state.unitWind === 'kmh' ? ' km/h':' mph')
-  conditionEl.textContent = getCondition(latest.tempC)
-  if(tempChart) updateCharts()
+function initCharts() {
+    const colors = getChartColors();
+    createDemoChart('tempChart', 'Temperatura', colors.temp);
+    createDemoChart('humChart', 'Umidità', colors.hum);
+    createDemoChart('presChart', 'Pressione', colors.pres);
+    createDemoChart('forecastChart', 'Previsioni', colors.forecast);
+    createDemoChart('historyChart', 'Storico', colors.history);
 }
 
-function getCondition(t){
-  if(t>=28) return 'Caldo'
-  if(t>=20) return 'Soleggiato'
-  if(t>=10) return 'Nuvoloso'
-  return 'Fresco'
-}
+// --- Event Listeners ---
 
-// periodic update (mock receiving new data every 5 seconds)
-function startMockUpdates(){
-  if(mockIntervalId) return
-  // if no data present seed 24 points
-  if(state.data.length === 0) seedInitialData()
-  // ensure charts and UI reflect seeded data immediately
-  if(tempChart) updateCharts()
-  render()
+// Autenticazione
+qs('#btnLogin').addEventListener('click', () => {
+    // Simulazione di login riuscito
+    showSection('dashboard-section');
+});
 
-  mockIntervalId = setInterval(()=>{
-    const now = new Date()
-    const point = generateMockPoint(now)
-    state.data.push(point)
-    if(state.data.length>48) state.data.shift()
-    updateCharts()
-    render()
-  },5000)
-}
+qs('#logoutBtn').addEventListener('click', () => {
+    showSection('login-section');
+});
 
-function stopMockUpdates(){
-  if(!mockIntervalId) return
-  clearInterval(mockIntervalId)
-  mockIntervalId = null
-}
+// Switch tra form
+qs('#showRegister').addEventListener('click', (e) => {
+    e.preventDefault();
+    showSection('register-section');
+});
 
-// export CSV/JSON
-function exportData(){
-  const csv = toCSV(state.data)
-  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'})
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'meteo_export.csv'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-function toCSV(arr){
-  const headers = ['ts','tempC','humidity','pressure','windKmh']
-  const rows = arr.map(r=>headers.map(h=>r[h]).join(','))
-  return headers.join(',')+"\n"+rows.join('\n')
-}
+qs('#showLogin').addEventListener('click', (e) => {
+    e.preventDefault();
+    showSection('login-section');
+});
 
-// init
-applyTheme()
-createCharts()
-render()
+// Navigazione
+qsa('.nav-link').forEach(btn => btn.addEventListener('click', () => showPage(btn.dataset.target)));
 
-// keyboard accessibility: Esc closes modal
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') modal.classList.add('hidden') })
+// Salvataggio impostazioni
+qs('#saveSettings').addEventListener('click', () => {
+    const newUnit = qs('#unitTemp').value;
+    const newTheme = qs('#themeSelect').value;
+    
+    appState.settings.unitTemp = newUnit;
+    appState.settings.theme = newTheme;
+    
+    applyTheme(newTheme);
+    updateDashboard();
+    
+    alert('💾 Impostazioni salvate con successo!');
+});
 
-// initialize controls (mock checkbox)
-if(mockCheckbox){
-  mockCheckbox.checked = state.mockEnabled
-  mockCheckbox.addEventListener('change', ()=>{
-    state.mockEnabled = mockCheckbox.checked
-    if(state.mockEnabled) startMockUpdates()
-    else stopMockUpdates()
-  })
-}
+
+// --- Inizializzazione ---
+
+// Applicazione del tema iniziale e impostazioni iniziali
+applyTheme(appState.settings.theme);
+qs('#unitTemp').value = appState.settings.unitTemp;
+qs('#themeSelect').value = appState.settings.theme;
+
+// Inizializzazione dei grafici
+initCharts(); 
+
+// Avvio: mostra la pagina di login
+showSection('login-section');
