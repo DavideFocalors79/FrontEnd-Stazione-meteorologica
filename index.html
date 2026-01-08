@@ -1,152 +1,158 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Stazione Meteo</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stazione Meteo - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <i class="fas fa-cloud-sun header-icon"></i>
+                    <h1>Stazione Meteo</h1>
+                </div>
+                <div class="header-right">
+                    <div class="last-update">
+                        <i class="fas fa-sync-alt"></i>
+                        <span id="lastUpdate">Caricamento...</span>
+                    </div>
+                    <button class="theme-toggle" id="themeToggle" aria-label="Cambia tema">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
 
-<section id="login-section" class="section active">
-  <div class="auth-card">
-    <h1>🌤️ Stazione Meteo</h1>
-    <h2>Accedi</h2>
-    <label>Email</label>
-    <input type="email" id="loginEmail" placeholder="es. utente@email.it">
-    <label>Password</label>
-    <input type="password" id="loginPassword" placeholder="Password">
-    <button id="btnLogin" class="btn-primary">🔐 Accedi</button>
-    <p class="muted">Non hai un account? <a href="#" id="showRegister">Registrati</a></p>
-  </div>
-</section>
+        <div class="error-banner" id="errorBanner">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorMessage"></span>
+            <button class="close-error" id="closeError">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
 
-<section id="register-section" class="section">
-  <div class="auth-card">
-    <h1>🌤️ Stazione Meteo</h1>
-    <h2>Registrati</h2>
-    <label>Nome</label>
-    <input type="text" id="regName" placeholder="Mario Rossi">
-    <label>Email</label>
-    <input type="email" id="regEmail" placeholder="es. mario@email.it">
-    <label>Password</label>
-    <input type="password" id="regPassword" placeholder="Password">
-    <label>Ruolo</label>
-    <select id="regRole">
-      <option value="Utente">Utente</option>
-      <option value="Admin">Admin</option>
-    </select>
-    <button id="btnRegister" class="btn-primary">📝 Crea Account</button>
-    <p class="muted">Hai già un account? <a href="#" id="showLogin">Accedi</a></p>
-  </div>
-</section>
+        <main class="main-content">
+            <section class="current-weather">
+                <h2 class="section-title">Condizioni Attuali</h2>
+                <div class="weather-grid">
+                    <div class="weather-card temperature-card">
+                        <div class="card-header">
+                            <i class="fas fa-thermometer-half card-icon"></i>
+                            <h3>Temperatura</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="main-value" id="temperature">
+                                <span class="value">--</span>
+                                <span class="unit">°C</span>
+                            </div>
+                            <div class="sub-info">
+                                <div class="sub-item">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span id="tempMax">--°C</span>
+                                </div>
+                                <div class="sub-item">
+                                    <i class="fas fa-arrow-down"></i>
+                                    <span id="tempMin">--°C</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-<section id="dashboard-section" class="section">
-  <header class="topbar">
-    <h1>🌤️ Stazione Meteo</h1>
-    <nav class="main-nav">
-      <button class="nav-link active-nav" data-target="dashboard">Dashboard</button>
-      <button class="nav-link" data-target="forecast">Previsioni</button>
-      <button class="nav-link" data-target="history">Storico</button>
-      <button class="nav-link" data-target="alerts">Allerte</button>
-      <button class="nav-link" data-target="profile">Profilo</button>
-      <button class="nav-link" data-target="settings">Impostazioni</button>
-      <button id="logoutBtn" class="btn-ghost">Logout</button>
-    </nav>
-  </header>
+                    <div class="weather-card humidity-card">
+                        <div class="card-header">
+                            <i class="fas fa-tint card-icon"></i>
+                            <h3>Umidità</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="main-value" id="humidity">
+                                <span class="value">--</span>
+                                <span class="unit">%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="humidityProgress"></div>
+                            </div>
+                            <div class="sub-text" id="humidityStatus">Normale</div>
+                        </div>
+                    </div>
 
-  <main class="container">
-        <div id="page-dashboard" class="page active">
-      <section class="card current-card">
-        <h2 id="location">Località: --</h2>
-        <div class="main-row">
-          <div class="temp">
-            <div id="temperature" class="big-temp">--°C</div>
-            <div id="condition">--</div>
-          </div>
-          <div class="details">
-            <div>🌡️ Umidità: <span id="humidity">--%</span></div>
-            <div>⏲️ Pressione: <span id="pressure">-- hPa</span></div>
-            <div>💨 Vento: <span id="wind">-- km/h</span></div>
-          </div>
-        </div>
-      </section>
+                    <div class="weather-card pressure-card">
+                        <div class="card-header">
+                            <i class="fas fa-gauge-high card-icon"></i>
+                            <h3>Pressione</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="main-value" id="pressure">
+                                <span class="value">--</span>
+                                <span class="unit">hPa</span>
+                            </div>
+                            <div class="sub-info">
+                                <i class="fas fa-chart-line" id="pressureTrend"></i>
+                                <span id="pressureStatus">Stabile</span>
+                            </div>
+                        </div>
+                    </div>
 
-      <div class="charts-column">
-        <section class="card fixed-chart">
-          <h3>Temperature (24h)</h3>
-          <canvas id="tempChart"></canvas>
-        </section>
-        <section class="card fixed-chart">
-          <h3>Umidità</h3>
-          <canvas id="humChart"></canvas>
-        </section>
-        <section class="card fixed-chart">
-          <h3>Pressione</h3>
-          <canvas id="presChart"></canvas>
-        </section>
-      </div>
-    </div>
+                    <div class="weather-card wind-card">
+                        <div class="card-header">
+                            <i class="fas fa-wind card-icon"></i>
+                            <h3>Vento</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="wind-compass">
+                                <div class="compass-arrow" id="windArrow">
+                                    <i class="fas fa-location-arrow"></i>
+                                </div>
+                                <div class="compass-directions">
+                                    <span class="dir-n">N</span>
+                                    <span class="dir-e">E</span>
+                                    <span class="dir-s">S</span>
+                                    <span class="dir-w">O</span>
+                                </div>
+                            </div>
+                            <div class="wind-info">
+                                <div class="main-value" id="windSpeed">
+                                    <span class="value">--</span>
+                                    <span class="unit">km/h</span>
+                                </div>
+                                <div class="sub-text" id="windDirection">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-        <div id="page-forecast" class="page">
-      <section class="card">
-        <h2>Previsioni Meteo (7 giorni)</h2>
-        <canvas id="forecastChart"></canvas>
-      </section>
-    </div>
+            <section class="charts-section">
+                <h2 class="section-title">Tendenze</h2>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3 class="chart-title">
+                            <i class="fas fa-chart-line"></i>
+                            Temperatura (24h)
+                        </h3>
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">
+                            <i class="fas fa-chart-area"></i>
+                            Umidità & Pressione (24h)
+                        </h3>
+                        <canvas id="humidityPressureChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
 
-        <div id="page-history" class="page">
-      <section class="card">
-        <h2>Storico Dati (Ultimi 30 giorni)</h2>
-        <canvas id="historyChart"></canvas>
-      </section>
-    </div>
+        <footer class="footer">
+            <p>© 2026 Stazione Meteo </p>
+        </footer>
+    </div>
 
-        <div id="page-alerts" class="page">
-      <section class="card">
-        <h2>Allerte Meteo</h2>
-        <ul id="alertsList"></ul>
-      </section>
-    </div>
-
-        <div id="page-profile" class="page">
-      <div class="profile-card">
-        <h2>Profilo Utente</h2>
-        <p><strong>Nome:</strong> <span id="profileName">--</span></p>
-        <p><strong>Email:</strong> <span id="profileEmail">--</span></p>
-        <p><strong>Ruolo:</strong> <span id="profileRole">--</span></p>
-        <p><strong>Cronologia accessi:</strong></p>
-        <ul id="profileHistory">
-          <li>16/10/2025 08:00 - Accesso da browser Chrome</li>
-          <li>15/10/2025 20:45 - Accesso da app mobile</li>
-        </ul>
-      </div>
-    </div>
-
-        <div id="page-settings" class="page">
-      <div class="settings-card compact-settings">
-        <h2>Impostazioni</h2>
-        <div class="setting-item">
-          <label>Unità di temperatura</label>
-          <select id="unitTemp">
-            <option value="C">Celsius</option>
-            <option value="F">Fahrenheit</option>
-          </select>
-        </div>
-        <div class="setting-item">
-          <label>Tema</label>
-          <select id="themeSelect">
-            <option value="light">Chiaro</option>
-            <option value="dark">Scuro</option>
-          </select>
-        </div>
-        <button id="saveSettings" class="btn-primary">💾 Salva impostazioni</button>
-      </div>
-    </div>
-  </main>
-</section>
-
-<script src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="config.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
