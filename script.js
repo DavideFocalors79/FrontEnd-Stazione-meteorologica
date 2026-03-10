@@ -133,7 +133,7 @@ class WeatherStation {
             this.currentData = this.parseThingsboardData(data);
         } catch (error) {
             console.error('Errore durante la fetch HTTPS:', error);
-            throw error; // Rilancia per la gestione globale degli errori
+            throw error; 
         }
     }
 
@@ -258,7 +258,6 @@ class WeatherStation {
     }
 
       updateUI() {
-        // Applica la conversione alla temperatura attuale
         const baseTemp = this.currentData.temperature || 0;
         const temp = this.convertTemp(baseTemp);
         
@@ -267,22 +266,19 @@ class WeatherStation {
         const windSpeed = this.currentData.windSpeed || 0;
         const windDirection = this.currentData.windDirection || 0;
 
-        // Aggiorna valore e unità nell'HTML
         document.querySelector('#temperature .value').textContent = temp.toFixed(1);
         document.querySelector('#temperature .unit').textContent = `°${this.tempUnit}`;
        
         const tempHistory = this.historicalData.temperature;
         if (tempHistory.length > 0) {
-            // Applica la conversione a min e max
             const maxTemp = this.convertTemp(Math.max(...tempHistory));
             const minTemp = this.convertTemp(Math.min(...tempHistory));
             document.getElementById('tempMax').textContent = `${maxTemp.toFixed(1)}°${this.tempUnit}`;
             document.getElementById('tempMin').textContent = `${minTemp.toFixed(1)}°${this.tempUnit}`;
         }
 
-        // ... IL RESTO DELLA FUNZIONE RIMANE UGUALE ...
         document.querySelector('#humidity .value').textContent = humidity.toFixed(0);
-        // ...
+  
         const humidityProgress = document.getElementById('humidityProgress');
         humidityProgress.style.width = `${Math.min(humidity, 100)}%`;
        
@@ -443,9 +439,7 @@ class WeatherStation {
         );
 
         this.charts.temperature.data.labels = labels;
-        // Converti tutto lo storico per il grafico
         this.charts.temperature.data.datasets[0].data = this.historicalData.temperature.map(t => this.convertTemp(t));
-        // Aggiorna l'etichetta del grafico
         this.charts.temperature.data.datasets[0].label = `Temperatura (°${this.tempUnit})`;
         this.charts.temperature.update('none');
 
