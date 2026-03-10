@@ -1,5 +1,5 @@
 class WeatherStation {
-    constructor() {
+  constructor() {
         this.charts = {};
         this.historicalData = {
             temperature: [],
@@ -9,6 +9,7 @@ class WeatherStation {
         };
         this.currentData = {};
         this.updateInterval = null;
+        this.tempUnit = localStorage.getItem('tempUnit') || 'C';
        
         this.init();
     }
@@ -16,6 +17,7 @@ class WeatherStation {
     init() {
         this.setupThemeToggle();
         this.setupCharts();
+        this.setupUnitToggle();
         this.loadData();
         this.startAutoUpdate();
         this.setupErrorHandling();
@@ -35,6 +37,30 @@ class WeatherStation {
             this.updateThemeIcon(newTheme);
             this.updateChartTheme();
         });
+    }
+
+    setupUnitToggle() {
+        const unitToggle = document.getElementById('tempUnitToggle');
+        unitToggle.textContent = `°${this.tempUnit}`;
+
+        unitToggle.addEventListener('click', () => {
+         
+            this.tempUnit = this.tempUnit === 'C' ? 'F' : 'C';
+            localStorage.setItem('tempUnit', this.tempUnit);
+            unitToggle.textContent = `°${this.tempUnit}`;
+            
+            if (this.currentData.temperature !== undefined) {
+                this.updateUI();
+                this.updateCharts();
+            }
+        });
+    }
+
+    convertTemp(celsius) {
+        if (this.tempUnit === 'F') {
+            return (celsius * 9/5) + 32;
+        }
+        return celsius;
     }
 
     updateThemeIcon(theme) {
@@ -87,7 +113,6 @@ class WeatherStation {
             return;
         }
 
-        // Il protocollo HTTPS è garantito dall'URL in config.js
         const url = `${CONFIG.thingsboard.url}/api/plugins/telemetry/DEVICE/${CONFIG.thingsboard.deviceId}/values/timeseries`;
         const keys = Object.values(CONFIG.thingsboard.telemetryKeys).join(',');
        
@@ -232,24 +257,32 @@ class WeatherStation {
         }
     }
 
-    updateUI() {
-        const temp = this.currentData.temperature || 0;
+      updateUI() {
+        // Applica la conversione alla temperatura attuale
+        const baseTemp = this.currentData.temperature || 0;
+        const temp = this.convertTemp(baseTemp);
+        
         const humidity = this.currentData.humidity || 0;
         const pressure = this.currentData.pressure || 0;
         const windSpeed = this.currentData.windSpeed || 0;
         const windDirection = this.currentData.windDirection || 0;
 
+        // Aggiorna valore e unità nell'HTML
         document.querySelector('#temperature .value').textContent = temp.toFixed(1);
+        document.querySelector('#temperature .unit').textContent = `°${this.tempUnit}`;
        
         const tempHistory = this.historicalData.temperature;
         if (tempHistory.length > 0) {
-            const maxTemp = Math.max(...tempHistory);
-            const minTemp = Math.min(...tempHistory);
-            document.getElementById('tempMax').textContent = `${maxTemp.toFixed(1)}°C`;
-            document.getElementById('tempMin').textContent = `${minTemp.toFixed(1)}°C`;
+            // Applica la conversione a min e max
+            const maxTemp = this.convertTemp(Math.max(...tempHistory));
+            const minTemp = this.convertTemp(Math.min(...tempHistory));
+            document.getElementById('tempMax').textContent = `${maxTemp.toFixed(1)}°${this.tempUnit}`;
+            document.getElementById('tempMin').textContent = `${minTemp.toFixed(1)}°${this.tempUnit}`;
         }
 
+        // ... IL RESTO DELLA FUNZIONE RIMANE UGUALE ...
         document.querySelector('#humidity .value').textContent = humidity.toFixed(0);
+        // ...
         const humidityProgress = document.getElementById('humidityProgress');
         humidityProgress.style.width = `${Math.min(humidity, 100)}%`;
        
@@ -404,13 +437,16 @@ class WeatherStation {
         });
     }
 
-    updateCharts() {
+   updateCharts() {
         const labels = this.historicalData.timestamps.map(t =>
             t.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
         );
 
         this.charts.temperature.data.labels = labels;
-        this.charts.temperature.data.datasets[0].data = this.historicalData.temperature;
+        // Converti tutto lo storico per il grafico
+        this.charts.temperature.data.datasets[0].data = this.historicalData.temperature.map(t => this.convertTemp(t));
+        // Aggiorna l'etichetta del grafico
+        this.charts.temperature.data.datasets[0].label = `Temperatura (°${this.tempUnit})`;
         this.charts.temperature.update('none');
 
         this.charts.humidityPressure.data.labels = labels;
