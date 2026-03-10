@@ -8,7 +8,7 @@ L’applicazione si interfaccia con un server ThingsBoard, utilizzato per la rac
 **Tecnologia di frontend**  
 HTML5 per la struttura e i contenuti.  
 CSS3 per lo stile, il layout che si adatta a diversi schermi (responsive) e le animazioni.  
-Principalmente PHP e un po di JavaScript (ES6+) per la logica dell’app, aggiornare i dati e modificare la pagina senza ricaricarla. 
+PHP e JavaScript (ES6+) per la logica dell’app, aggiornare i dati e modificare la pagina senza ricaricarla. 
 **Visualizzazione grafica**  
 Per i grafici si utilizza Chart.js, che è semplice, leggero e si integra facilmente. Permette di creare grafici a linee, a barre e altri tipi base, poi verrà integrato con ThingsBoard.  
 I grafici mostrano dati come temperatura, umidità e pressione nel tempo, mentre le precipitazioni sono visualizzate con barre. Per il vento e le condizioni del cielo, si usano icone animate o sovrapposizioni.
