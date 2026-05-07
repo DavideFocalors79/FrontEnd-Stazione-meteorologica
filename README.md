@@ -9,7 +9,7 @@ File principali:
 - `config.js` - configurazione del token per riceve i dati dal dispositivo backend
 
 Come provare localmente:
-1. Apri `index.html` nel browser (funziona come pagina statica).
+1. Aprire `index.html` nel browser (funziona come pagina statica).
 
 Cosa è implementato:
 - Dashboard con condizioni attuali
