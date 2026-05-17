@@ -1,0 +1,133 @@
+# Feedback Docente – Sensori Meteo Frontend
+
+## Analisi dei Requisiti
+
+### Perimetro e priorità delle funzionalità
+
+Nei requisiti sono presenti funzionalità corrette ma molto avanzate rispetto allo scope di un frontend scolastico (previsioni meteo a 7 giorni, mappe meteo, notifiche avanzate).
+
+Manca ancora una distinzione esplicita tra funzionalità core realmente previste e possibili estensioni future. Questa separazione è necessaria per chiarire il perimetro implementativo del progetto e renderlo verificabile.
+
+---
+
+### Frequenza di aggiornamento dei dati
+
+La frequenza di aggiornamento è stata chiarita rispetto alla versione precedente, ma resta generica sul piano implementativo.
+
+Andrebbe definito in modo più preciso se il frontend aggiorna i dati secondo una logica configurabile oppure se si limita a mostrare l’ultimo dato disponibile fornito dal backend.
+
+---
+
+## Analisi Funzionale
+
+### Scope funzionale ancora ampio
+
+L’analisi funzionale è migliorata nella separazione tra frontend e backend, ma continua a includere numerose funzionalità avanzate come notifiche, previsioni estese, gestione utenti e componenti interattivi.
+
+Non emerge ancora una chiara distinzione tra funzionalità essenziali per il progetto e funzionalità accessorie o future.
+
+---
+
+### Definizione del nucleo minimo del progetto
+
+Nei documenti non è ancora identificato in modo esplicito un MVP (Minimum Viable Product).
+
+Andrebbe chiarito quali funzionalità devono essere necessariamente completate per considerare il frontend stabile e valutabile nelle milestone previste.
+
+---
+
+## Analisi Tecnica (valutazione indicativa)
+
+### Scelte architetturali e integrazione dati
+
+L’analisi tecnica è migliorata nella definizione dello stack e del confine frontend/backend.
+
+Sono ora esplicitati:
+
+* utilizzo di architettura SPA,
+* integrazione tramite API,
+* utilizzo di ThingsBoard come sorgente dati,
+* separazione tra acquisizione dati e visualizzazione.
+
+Rimangono però alcune sezioni ancora molto descrittive e poco operative.
+
+---
+
+### Organizzazione tecnica dell’applicazione
+
+Mancano alcuni dettagli implementativi minimi utili a valutare concretamente l’organizzazione tecnica del frontend, ad esempio:
+
+* struttura dei componenti,
+* gestione dello stato condiviso,
+* strategia di integrazione con le API,
+* modalità di gestione delle dipendenze applicative.
+
+L’analisi risulta quindi coerente ma ancora parzialmente astratta sul piano operativo.
+
+---
+
+### Qualità applicativa e gestione errori
+
+La gestione degli errori e degli stati applicativi è stata introdotta correttamente rispetto alle revisioni precedenti.
+
+Sarebbe comunque utile chiarire meglio quali comportamenti minimi siano previsti in caso di:
+
+* assenza dati,
+* timeout,
+* problemi di rete,
+* errori di sincronizzazione con il backend.
+
+---
+
+## Project Plan
+
+### Struttura del documento
+
+Il Project Plan è stato migliorato rispetto alla versione precedente e ora include:
+
+* milestone,
+* assegnazione attività,
+* ruoli interni,
+* obiettivi di avanzamento.
+
+Il documento risulta quindi più coerente con una gestione progettuale reale.
+
+---
+
+### Monitoraggio delle milestone e stato avanzamento
+
+Rimane però assente una reale tracciatura dell’evoluzione del progetto nel tempo.
+
+Non sono presenti sezioni dedicate a:
+
+* stato di avanzamento delle milestone,
+* feedback ricevuti,
+* modifiche apportate dopo le revisioni,
+* variazioni nell’organizzazione del gruppo.
+
+Di conseguenza il documento descrive la struttura del progetto, ma non documenta ancora concretamente il processo di gestione e adattamento richiesto dalla consegna.
+
+---
+
+## Diagramma di Gantt
+
+### Coerenza della pianificazione
+
+Il diagramma di Gantt risulta coerente con la suddivisione generale delle milestone e delle attività principali.
+
+La pianificazione temporale appare compatibile con gli obiettivi dichiarati del progetto.
+
+---
+
+### Utilizzo operativo del Gantt
+
+Non emerge però un collegamento operativo tra il Gantt e l’avanzamento reale del progetto.
+
+Andrebbe chiarito:
+
+* come il diagramma venga aggiornato nel tempo,
+* come vengano gestiti eventuali ritardi,
+* come venga monitorata la distribuzione del lavoro tra i membri del gruppo,
+* come le milestone influenzino la revisione della pianificazione.
+
+In questo stato il Gantt appare più come rappresentazione iniziale delle attività che come reale strumento di monitoraggio progettuale.
