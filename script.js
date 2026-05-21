@@ -136,7 +136,7 @@ class AdminPanel {
 
     show() {
         this.modal.classList.add('show');
-        this._renderUserList();
+        this._renderUserList(); // async, non bloccante
         this.usernameIn.focus();
     }
 
@@ -162,49 +162,65 @@ class AdminPanel {
         const password = this.passwordIn.value;
         const role     = this.roleSelect.value;
 
-        this._setMsg('Creazione in corso…', 'info');
+        this._setMsg('Creazione in corso...', 'info');
         this.createBtn.disabled = true;
 
         try {
             await auth.createUser(username, password, role);
-            this._setMsg(`✓ Utente "${username}" (${role}) creato`, 'success');
+            this._setMsg(`Utente "${username}" (${role}) creato con successo`, 'success');
             this._clearForm();
-            this._renderUserList();
+            await this._renderUserList();
         } catch (err) {
-            this._setMsg(`✗ ${err.message}`, 'error');
+            this._setMsg(err.message, 'error');
         } finally {
             this.createBtn.disabled = false;
         }
     }
 
-    _renderUserList() {
-        const users   = auth.listUsers();
+    async _renderUserList() {
+        this.listEl.innerHTML = '<p class="no-users">Caricamento...</p>';
+        let users;
+        try {
+            users = await auth.listUsers();
+        } catch (err) {
+            this.listEl.innerHTML = `<p class="no-users">Errore: ${err.message}</p>`;
+            return;
+        }
+
         const session = auth.getSession();
 
-        if (users.length === 0) {
+        if (!users || users.length === 0) {
             this.listEl.innerHTML = '<p class="no-users">Nessun utente</p>';
             return;
         }
 
-        this.listEl.innerHTML = users.map(u => `
-            <div class="user-row">
-                <div class="user-info">
-                    <span class="user-icon">${u.role === 'admin' ? '🔑' : '👤'}</span>
-                    <span class="user-name">${this._escHtml(u.username)}</span>
-                    <span class="user-role ${u.role}">${u.role}</span>
-                </div>
-                <div class="user-meta">
-                    <span class="user-date">${new Date(u.createdAt).toLocaleDateString('it-IT')}</span>
-                    ${u.username !== session?.username
-                        ? `<button class="btn-delete" data-user="${this._escHtml(u.username)}"
-                              aria-label="Elimina ${this._escHtml(u.username)}">
-                              <i class="fas fa-trash"></i>
-                           </button>`
-                        : '<span class="user-you">tu</span>'
-                    }
-                </div>
-            </div>
-        `).join('');
+        this.listEl.innerHTML = users.map(u => {
+            const roleIcon = u.role === 'admin'
+                ? '<i class="fas fa-key user-icon-i"></i>'
+                : '<i class="fas fa-user user-icon-i"></i>';
+            const dateStr  = u.created_at
+                ? new Date(u.created_at).toLocaleDateString('it-IT')
+                : '';
+            const action   = u.username !== session?.username
+                ? `<button class="btn-delete" data-user="${this._escHtml(u.username)}"
+                       aria-label="Elimina ${this._escHtml(u.username)}">
+                       <i class="fas fa-trash"></i>
+                   </button>`
+                : '<span class="user-you">(tu)</span>';
+
+            return `
+                <div class="user-row">
+                    <div class="user-info">
+                        ${roleIcon}
+                        <span class="user-name">${this._escHtml(u.username)}</span>
+                        <span class="user-role ${u.role}">${u.role}</span>
+                    </div>
+                    <div class="user-meta">
+                        <span class="user-date">${dateStr}</span>
+                        ${action}
+                    </div>
+                </div>`;
+        }).join('');
 
         this.listEl.querySelectorAll('.btn-delete').forEach(btn => {
             btn.addEventListener('click', () => this._handleDelete(btn.dataset.user));
@@ -214,10 +230,10 @@ class AdminPanel {
     async _handleDelete(username) {
         if (!confirm(`Eliminare l'utente "${username}"?`)) return;
         try {
-            auth.deleteUser(username);
-            this._renderUserList();
+            await auth.deleteUser(username);
+            await this._renderUserList();
         } catch (err) {
-            this._setMsg(`✗ ${err.message}`, 'error');
+            this._setMsg(err.message, 'error');
         }
     }
 
