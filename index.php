@@ -3,23 +3,27 @@
    index.php  —  Stazione Meteo
    File unico: gestisce le chiamate API in PHP e serve la pagina HTML.
 
-   Avvio rapido (doppio click su avvia.bat):
+   Avvio rapido (doppio click su avvia.bat / avvia.sh):
      php -S localhost:8080
    poi apri  http://localhost:8080
 ================================================================ */
 
+/* ── Configurazione database ─────────────────────────────────── */
 define('DB_HOST',    '192.168.60.144');
 define('DB_NAME',    'davide_laghi_stazione');
 define('DB_USER',    'davide_laghi');
 define('DB_PASS',    'insipide.bruchi.');
-define('DB_TIMEOUT', 3);
+define('DB_TIMEOUT', 3);   // secondi — deve essere < timeout fetch JS (9s)
 
 /* ================================================================
-   BLOCCO API — attivo solo quando arriva il parametro "action"
+   BLOCCO API  —  attivo solo quando arriva il parametro "action"
+   Risponde JSON e termina; la pagina HTML non viene mai inviata.
 ================================================================ */
 $action = $_GET['action'] ?? (json_decode(file_get_contents('php://input'), true)['action'] ?? '');
 
 if ($action !== '') {
+
+    /* ── avvia sessione e headers JSON ───────────────────────── */
     session_start();
     header('Content-Type: application/json; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
@@ -29,6 +33,7 @@ if ($action !== '') {
         http_response_code(204); exit;
     }
 
+    /* ── connessione DB ──────────────────────────────────────── */
     $db           = null;
     $db_available = false;
     $db_error     = '';
@@ -43,11 +48,13 @@ if ($action !== '') {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
         ];
+        // MYSQL_ATTR_CONNECT_TIMEOUT esiste solo con pdo_mysql attivo
         if (defined('PDO::MYSQL_ATTR_CONNECT_TIMEOUT')) {
             $pdo_opts[PDO::MYSQL_ATTR_CONNECT_TIMEOUT] = DB_TIMEOUT;
         }
         $db = new PDO($dsn, DB_USER, DB_PASS, $pdo_opts);
 
+        /* crea tabella se non esiste */
         $db->exec("
             CREATE TABLE IF NOT EXISTS users (
                 id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -59,6 +66,7 @@ if ($action !== '') {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
 
+        /* crea admin di default se la tabella e' vuota */
         if ((int)$db->query("SELECT COUNT(*) FROM users")->fetchColumn() === 0) {
             $h = password_hash('Admin@2026!', PASSWORD_BCRYPT, ['cost' => 12]);
             $db->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')")
@@ -66,11 +74,13 @@ if ($action !== '') {
         }
 
         $db_available = true;
+
     } catch (PDOException $e) {
         $db_error = $e->getMessage();
         error_log('[WeatherStation] DB: ' . $e->getMessage());
     }
 
+    /* ── helpers ─────────────────────────────────────────────── */
     function jout(array $d, int $c = 200): void {
         http_response_code($c);
         echo json_encode($d, JSON_UNESCAPED_UNICODE);
@@ -98,24 +108,43 @@ if ($action !== '') {
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
+    /* ── router ──────────────────────────────────────────────── */
     switch ($action) {
+
         case 'ping':
-            jout(['ok' => true, 'db' => $db_available, 'db_error' => $db_available ? null : $db_error, 'session' => $_SESSION['user'] ?? null]);
+            jout([
+                'ok'       => true,
+                'db'       => $db_available,
+                'db_error' => $db_available ? null : $db_error,
+                'session'  => $_SESSION['user'] ?? null,
+            ]);
 
         case 'check':
-            jout(['ok' => !empty($_SESSION['user']), 'user' => $_SESSION['user'] ?? null, 'db' => $db_available]);
+            jout([
+                'ok'   => !empty($_SESSION['user']),
+                'user' => $_SESSION['user'] ?? null,
+                'db'   => $db_available,
+            ]);
 
         case 'login':
             if (!$db_available) jout(['error' => 'DB_UNAVAILABLE', 'db' => false], 503);
+
             $uname = trim($body['username'] ?? '');
             $upass = $body['password'] ?? '';
             if (!$uname || !$upass) jout(['error' => 'Username e password richiesti'], 400);
+
             $stmt = $db->prepare("SELECT username, password_hash, role FROM users WHERE LOWER(username)=LOWER(?)");
             $stmt->execute([$uname]);
             $user = $stmt->fetch();
+
             $dummy = '$2y$12$invalidhashplaceholderxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
             $valid = password_verify($upass, $user ? $user['password_hash'] : $dummy) && $user;
-            if (!$valid) { usleep(300000 + random_int(0, 200000)); jout(['error' => 'Username o password non validi'], 401); }
+
+            if (!$valid) {
+                usleep(300000 + random_int(0, 200000));
+                jout(['error' => 'Username o password non validi'], 401);
+            }
+
             session_regenerate_id(true);
             $_SESSION['user'] = ['username' => $user['username'], 'role' => $user['role']];
             jout(['ok' => true, 'username' => $user['username'], 'role' => $user['role']]);
@@ -127,17 +156,22 @@ if ($action !== '') {
         case 'create_user':
             need_admin();
             if (!$db_available) jout(['error' => 'Database non disponibile'], 503);
+
             $nu = trim($body['username'] ?? '');
             $np = $body['password'] ?? '';
             $nr = in_array($body['role'] ?? '', ['admin','user'], true) ? $body['role'] : 'user';
+
             if ($e = val_username($nu)) jout(['error' => $e], 400);
             if ($e = val_password($np)) jout(['error' => $e], 400);
+
             try {
                 $h = password_hash($np, PASSWORD_BCRYPT, ['cost' => 12]);
-                $db->prepare("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)")->execute([$nu, $h, $nr]);
+                $db->prepare("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)")
+                   ->execute([$nu, $h, $nr]);
                 jout(['ok' => true]);
             } catch (PDOException $e) {
-                jout(['error' => (int)$e->getCode() === 23000 ? 'Username gia in uso' : 'Errore database'], (int)$e->getCode() === 23000 ? 409 : 500);
+                jout(['error' => (int)$e->getCode() === 23000 ? 'Username gia in uso' : 'Errore database'],
+                     (int)$e->getCode() === 23000 ? 409 : 500);
             }
 
         case 'list_users':
@@ -149,9 +183,11 @@ if ($action !== '') {
         case 'delete_user':
             need_admin();
             if (!$db_available) jout(['error' => 'Database non disponibile'], 503);
+
             $target = trim($body['username'] ?? '');
             if (!$target) jout(['error' => 'Username mancante'], 400);
             if ($target === $_SESSION['user']['username']) jout(['error' => 'Non puoi eliminare il tuo account'], 400);
+
             $stmt = $db->prepare("SELECT role FROM users WHERE username=?");
             $stmt->execute([$target]);
             $tu = $stmt->fetch();
@@ -168,28 +204,26 @@ if ($action !== '') {
 }
 
 /* ================================================================
-   PAGINA HTML
+   PAGINA HTML  —  servita quando non c'e' "action"
 ================================================================ */
 ?><!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stazione Meteo — Dashboard</title>
+    <title>Stazione Meteo - Rovigo Viola Marchesini</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         LOGIN OVERLAY
-    ═══════════════════════════════════════════════════════════════ -->
+    <!-- LOGIN OVERLAY -->
     <div class="login-overlay" id="loginOverlay">
         <div class="login-card">
             <div class="login-logo">
                 <i class="fas fa-cloud-sun"></i>
             </div>
-            <h2 class="login-title">Stazione Meteo</h2>
+            <h2 class="login-title">Rovigo - Viola Marchesini</h2>
             <p class="login-subtitle">Accedi per visualizzare la dashboard</p>
             <div class="login-form">
                 <div class="field-group">
@@ -220,9 +254,7 @@ if ($action !== '') {
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         PANNELLO ADMIN (modal)
-    ═══════════════════════════════════════════════════════════════ -->
+    <!-- PANNELLO ADMIN -->
     <div class="modal-overlay" id="adminModal">
         <div class="admin-panel">
             <div class="admin-header">
@@ -261,256 +293,171 @@ if ($action !== '') {
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         APP PRINCIPALE — layout con sidebar
-    ═══════════════════════════════════════════════════════════════ -->
-    <div class="app-shell" id="appContainer" style="display:none">
+    <!-- APP PRINCIPALE -->
+    <div class="container" id="appContainer" style="display:none">
 
-        <!-- ── SIDEBAR ────────────────────────────────────────── -->
-        <aside class="sidebar" id="sidebar">
-
-            <!-- Logo / brand -->
-            <div class="sidebar-brand">
-                <i class="fas fa-cloud-bolt sidebar-brand-icon"></i>
-                <span class="sidebar-brand-text">MeteoNet</span>
-                <!-- Hamburger mobile -->
-                <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Chiudi menu">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <!-- Sezione stazioni -->
-            <div class="sidebar-section">
-                <div class="sidebar-section-header" id="stationsToggle" role="button" aria-expanded="true" tabindex="0">
-                    <i class="fas fa-tower-broadcast"></i>
-                    <span>Stazioni</span>
-                    <i class="fas fa-chevron-down sidebar-chevron"></i>
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <i class="fas fa-cloud-sun header-icon"></i>
+                    <h1>Rovigo - Viola Marchesini</h1>
                 </div>
-                <ul class="sidebar-station-list" id="stationList" role="listbox" aria-label="Selezione stazione"></ul>
-            </div>
-
-            <!-- Info stazione selezionata -->
-            <div class="sidebar-station-info" id="sidebarStationInfo">
-                <div class="station-info-row">
-                    <i class="fas fa-location-dot"></i>
-                    <span id="infoLocation">—</span>
-                </div>
-                <div class="station-info-row">
-                    <i class="fas fa-mountain-sun"></i>
-                    <span id="infoAltitude">—</span>
-                </div>
-                <div class="station-info-row">
-                    <i class="fas fa-circle-dot station-status-dot" id="infoStatusDot"></i>
-                    <span id="infoStatus">—</span>
-                </div>
-            </div>
-
-            <!-- Spacer -->
-            <div class="sidebar-spacer"></div>
-
-            <!-- Utente + azioni -->
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="sidebar-user-avatar" id="sidebarUserAvatar">?</div>
-                    <div class="sidebar-user-info">
-                        <span class="sidebar-user-name" id="sidebarUserName">—</span>
-                        <span class="sidebar-user-role" id="sidebarUserRole">—</span>
+                <div class="header-right">
+                    <div class="last-update">
+                        <i class="fas fa-sync-alt"></i>
+                        <span id="lastUpdate">Caricamento...</span>
+                    </div>
+                    <div class="header-actions">
+                        <div class="user-badge" id="userBadge">
+                            <i class="fas fa-user-circle"></i>
+                            <span id="userBadgeText"></span>
+                        </div>
+                        <button class="btn-icon header-btn" id="adminBtn"
+                            aria-label="Pannello Admin" style="display:none" title="Pannello Admin">
+                            <i class="fas fa-users-cog"></i>
+                        </button>
+                        <button class="theme-toggle" id="tempUnitToggle"
+                            aria-label="Cambia unita di misura">°C</button>
+                        <button class="theme-toggle" id="themeToggle" aria-label="Cambia tema">
+                            <i class="fas fa-moon"></i>
+                        </button>
+                        <button class="btn-icon header-btn logout-btn" id="logoutBtn"
+                            aria-label="Logout" title="Logout">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
                     </div>
                 </div>
-                <div class="sidebar-footer-actions">
-                    <button class="sidebar-action-btn" id="adminBtnSidebar"
-                        aria-label="Pannello Admin" title="Pannello Admin" style="display:none">
-                        <i class="fas fa-users-cog"></i>
-                    </button>
-                    <button class="sidebar-action-btn" id="tempUnitToggleSidebar"
-                        aria-label="Cambia unita di misura">°C</button>
-                    <button class="sidebar-action-btn" id="themeToggleSidebar" aria-label="Cambia tema">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    <button class="sidebar-action-btn danger" id="logoutBtnSidebar"
-                        aria-label="Logout" title="Logout">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </div>
             </div>
-        </aside>
+        </header>
 
-        <!-- Overlay backdrop per mobile -->
-        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+        <div class="error-banner" id="errorBanner">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorMessage"></span>
+            <button class="close-error" id="closeError">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
 
-        <!-- ── CONTENUTO PRINCIPALE ─────────────────────────── -->
-        <div class="main-wrapper">
+        <main class="main-content">
+            <section class="current-weather">
+                <h2 class="section-title">Condizioni Attuali</h2>
+                <div class="weather-grid">
 
-            <!-- Top bar mobile -->
-            <header class="topbar">
-                <button class="topbar-menu-btn" id="sidebarOpenBtn" aria-label="Apri menu">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="topbar-station" id="topbarStation">
-                    <i class="fas fa-tower-broadcast"></i>
-                    <span id="topbarStationName">Caricamento...</span>
-                </div>
-                <div class="topbar-update">
-                    <i class="fas fa-sync-alt" id="topbarSyncIcon"></i>
-                    <span id="lastUpdate">—</span>
-                </div>
-            </header>
-
-            <!-- Error banner -->
-            <div class="error-banner" id="errorBanner">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span id="errorMessage"></span>
-                <button class="close-error" id="closeError">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <!-- Dashboard content -->
-            <main class="dashboard-content">
-
-                <!-- ── Intestazione stazione ── -->
-                <div class="station-header">
-                    <div class="station-header-left">
-                        <div class="station-icon-wrap" id="stationIconWrap">
-                            <i class="fas fa-tower-broadcast" id="stationHeaderIcon"></i>
+                    <div class="weather-card temperature-card">
+                        <div class="card-header">
+                            <i class="fas fa-thermometer-half card-icon"></i>
+                            <h3>Temperatura</h3>
                         </div>
-                        <div>
-                            <h1 class="station-title" id="stationHeaderName">—</h1>
-                            <p class="station-subtitle" id="stationHeaderLocation">—</p>
-                        </div>
-                    </div>
-                    <div class="station-header-right">
-                        <div class="station-badge online" id="stationBadge">
-                            <i class="fas fa-circle"></i>
-                            <span id="stationBadgeText">Online</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── Schede meteo attuali ── -->
-                <section class="current-weather">
-                    <h2 class="section-title">Condizioni Attuali</h2>
-                    <div class="weather-grid">
-
-                        <div class="weather-card temperature-card">
-                            <div class="card-header">
-                                <i class="fas fa-thermometer-half card-icon"></i>
-                                <h3>Temperatura</h3>
+                        <div class="card-body">
+                            <div class="main-value" id="temperature">
+                                <span class="value">--</span>
+                                <span class="unit">°C</span>
                             </div>
-                            <div class="card-body">
-                                <div class="main-value" id="temperature">
+                            <div class="sub-info">
+                                <div class="sub-item">
+                                    <i class="fas fa-arrow-up"></i>
+                                    <span id="tempMax">--°C</span>
+                                </div>
+                                <div class="sub-item">
+                                    <i class="fas fa-arrow-down"></i>
+                                    <span id="tempMin">--°C</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="weather-card humidity-card">
+                        <div class="card-header">
+                            <i class="fas fa-tint card-icon"></i>
+                            <h3>Umidita</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="main-value" id="humidity">
+                                <span class="value">--</span>
+                                <span class="unit">%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="humidityProgress"></div>
+                            </div>
+                            <div class="sub-text" id="humidityStatus">--</div>
+                        </div>
+                    </div>
+
+                    <div class="weather-card pressure-card">
+                        <div class="card-header">
+                            <i class="fas fa-gauge-high card-icon"></i>
+                            <h3>Pressione</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="main-value" id="pressure">
+                                <span class="value">--</span>
+                                <span class="unit">hPa</span>
+                            </div>
+                            <div class="sub-info">
+                                <i class="fas fa-minus" id="pressureTrend"></i>
+                                <span id="pressureStatus">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="weather-card wind-card">
+                        <div class="card-header">
+                            <i class="fas fa-wind card-icon"></i>
+                            <h3>Vento</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="wind-compass">
+                                <div class="compass-arrow" id="windArrow">
+                                    <i class="fas fa-location-arrow"></i>
+                                </div>
+                                <div class="compass-directions">
+                                    <span class="dir-n">N</span>
+                                    <span class="dir-e">E</span>
+                                    <span class="dir-s">S</span>
+                                    <span class="dir-w">O</span>
+                                </div>
+                            </div>
+                            <div class="wind-info">
+                                <div class="main-value" id="windSpeed">
                                     <span class="value">--</span>
-                                    <span class="unit">°C</span>
+                                    <span class="unit">km/h</span>
                                 </div>
-                                <div class="sub-info">
-                                    <div class="sub-item">
-                                        <i class="fas fa-arrow-up"></i>
-                                        <span id="tempMax">--°C</span>
-                                    </div>
-                                    <div class="sub-item">
-                                        <i class="fas fa-arrow-down"></i>
-                                        <span id="tempMin">--°C</span>
-                                    </div>
-                                </div>
+                                <div class="sub-text" id="windDirection">--</div>
                             </div>
-                        </div>
-
-                        <div class="weather-card humidity-card">
-                            <div class="card-header">
-                                <i class="fas fa-tint card-icon"></i>
-                                <h3>Umidità</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="main-value" id="humidity">
-                                    <span class="value">--</span>
-                                    <span class="unit">%</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" id="humidityProgress"></div>
-                                </div>
-                                <div class="sub-text" id="humidityStatus">--</div>
-                            </div>
-                        </div>
-
-                        <div class="weather-card pressure-card">
-                            <div class="card-header">
-                                <i class="fas fa-gauge-high card-icon"></i>
-                                <h3>Pressione</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="main-value" id="pressure">
-                                    <span class="value">--</span>
-                                    <span class="unit">hPa</span>
-                                </div>
-                                <div class="sub-info">
-                                    <i class="fas fa-minus" id="pressureTrend"></i>
-                                    <span id="pressureStatus">--</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="weather-card wind-card">
-                            <div class="card-header">
-                                <i class="fas fa-wind card-icon"></i>
-                                <h3>Vento</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="wind-compass">
-                                    <div class="compass-arrow" id="windArrow">
-                                        <i class="fas fa-location-arrow"></i>
-                                    </div>
-                                    <div class="compass-directions">
-                                        <span class="dir-n">N</span>
-                                        <span class="dir-e">E</span>
-                                        <span class="dir-s">S</span>
-                                        <span class="dir-w">O</span>
-                                    </div>
-                                </div>
-                                <div class="wind-info">
-                                    <div class="main-value" id="windSpeed">
-                                        <span class="value">--</span>
-                                        <span class="unit">km/h</span>
-                                    </div>
-                                    <div class="sub-text" id="windDirection">--</div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </section>
-
-                <!-- ── Grafici ── -->
-                <section class="charts-section">
-                    <h2 class="section-title">Tendenze (24h)</h2>
-                    <div class="charts-grid">
-                        <div class="chart-container">
-                            <h3 class="chart-title">
-                                <i class="fas fa-chart-line"></i>
-                                Temperatura
-                            </h3>
-                            <canvas id="temperatureChart"></canvas>
-                        </div>
-                        <div class="chart-container">
-                            <h3 class="chart-title">
-                                <i class="fas fa-chart-area"></i>
-                                Umidità &amp; Pressione
-                            </h3>
-                            <canvas id="humidityPressureChart"></canvas>
                         </div>
                     </div>
-                </section>
 
-            </main>
+                </div>
+            </section>
 
-            <footer class="footer">
-                <p>© 2026 MeteoNet — Stazione Meteorologica</p>
-            </footer>
-        </div><!-- /main-wrapper -->
-    </div><!-- /app-shell -->
+            <section class="charts-section">
+                <h2 class="section-title">Tendenze</h2>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3 class="chart-title">
+                            <i class="fas fa-chart-line"></i>
+                            Temperatura (24h)
+                        </h3>
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">
+                            <i class="fas fa-chart-area"></i>
+                            Umidita &amp; Pressione (24h)
+                        </h3>
+                        <canvas id="humidityPressureChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>© 2026 Stazione Meteo - Rovigo, Viola Marchesini</p>
+        </footer>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="config.js"></script>
-    <script src="stations.js"></script>
     <script src="auth.js"></script>
     <script src="script.js"></script>
 </body>
